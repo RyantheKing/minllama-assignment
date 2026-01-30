@@ -99,7 +99,7 @@ class Attention(nn.Module):
         # Apply attention dropout
         attn_weights = self.attn_dropout(F.softmax(scores, dim=-1))
         # Apply attention weights to values
-        output = torch.einsum('bhqk,bhkd->bhqd', attn_weights, value)
+        return torch.einsum('bhqk,bhkd->bhqd', attn_weights, value)
 
     def forward(
         self,
@@ -317,7 +317,7 @@ def load_pretrained(checkpoint):
   ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
   # init from a model saved in a specific directory
-  checkpoint_dict = torch.load(checkpoint, map_location=device)
+  checkpoint_dict = torch.load(checkpoint, map_location=device, weights_only=False)
   config = LlamaConfig(**checkpoint_dict['model_args'])
   model = Llama(config)
   state_dict = checkpoint_dict['model']

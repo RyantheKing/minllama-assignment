@@ -56,7 +56,7 @@ class LlamaEmbeddingClassifier(torch.nn.Module):
 		'''
 		# todo
 		# Get the hidden states from the LLaMA model
-		hidden_states, _ = self.llama(input_ids)
+		_, hidden_states = self.llama(input_ids)
 
 		# Take the hidden state corresponding to the last token of the sequence
 		# Assuming the sequence dimension is the second dimension (dim=1)
