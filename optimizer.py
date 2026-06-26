@@ -34,44 +34,46 @@ class AdamW(Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
+
                 grad = p.grad.data
                 if grad.is_sparse:
-                    raise RuntimeError("Adam does not support sparse gradients, please consider SparseAdam instead")
+                    raise RuntimeError("Adam does not support sparse gradients")
 
-                # State should be stored in this dictionary
                 state = self.state[p]
 
-                # Access hyperparameters from the `group` dictionary
-                alpha = group["lr"]
+                if len(state) == 0:
+                    state["step"] = 0
+                    state["exp_avg"] = torch.zeros_like(p.data)
+                    state["exp_avg_sq"] = torch.zeros_like(p.data)
+
+                exp_avg, exp_avg_sq = state["exp_avg"], state["exp_avg_sq"]
                 beta1, beta2 = group["betas"]
+                lr = group["lr"]
                 eps = group["eps"]
                 weight_decay = group["weight_decay"]
                 correct_bias = group["correct_bias"]
 
-                # Initialize state
-                if len(state) == 0:
-                    state['step'] = 0
-                    state['exp_avg'] = torch.zeros_like(p.data)
-                    state['exp_avg_sq'] = torch.zeros_like(p.data)
+                # Increment step
+                state["step"] += 1
 
-                # Update first and second moments of the gradients
-                state['exp_avg'].mul_(beta1).add_(grad, alpha=1 - beta1)
-                state['exp_avg_sq'].mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+                # Update moments
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
                 # Bias correction
-                # Please note that we are using the "efficient version" given in
-                # https://arxiv.org/abs/1412.6980
-                bias_correction1 = 1 - beta1 ** (state['step'] + 1)
-                bias_correction2 = 1 - beta2 ** (state['step'] + 1)
+                if correct_bias:
+                    bias_correction1 = 1 - beta1 ** state["step"]
+                    bias_correction2 = 1 - beta2 ** state["step"]
+                    step_size = lr * (bias_correction2 ** 0.5) / bias_correction1
+                else:
+                    step_size = lr
 
-                # Update parameters
-                update = state['exp_avg'] / (bias_correction1 * torch.sqrt(state['exp_avg_sq'] / bias_correction2) + eps)
+                # Parameter update
+                denom = exp_avg_sq.sqrt().add_(eps)
+                p.data.addcdiv_(exp_avg, denom, value=-step_size)
 
-                # Add weight decay after the main gradient-based updates.
-                # Please note that the learning rate should be incorporated into this update.
+                # Decoupled weight decay
                 if weight_decay != 0:
-                    update.add_(p.data, alpha=weight_decay)
-
-                p.data.add_(update, alpha=-alpha)
+                    p.data.add_(p.data, alpha=-lr * weight_decay)
 
         return loss

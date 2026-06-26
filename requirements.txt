@@ -1,0 +1,11 @@
+tqdm
+requests
+importlib-metadata
+filelock
+scikit-learn
+numpy
+tokenizers
+sentencepiece
+torch
+torchvision
+torchaudio
